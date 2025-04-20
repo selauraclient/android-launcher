@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Selaura Launcher</string>
+    <string name="xal_token">ms-xal-0000000048183522</string>
+    <string name="xerr_unknown">Unknown Xbox Live API error %d</string>
+    <string name="xerr_no_account">You don\'t seem to have an Xbox Live account. Please log in once on https://minecraft.net/ and try again.</string>
+    <string name="xerr_adult_verification">An adult needs to verify your account.</string>
+    <string name="xerr_child">Your account is a child account, and needs to be added into a Family in order to log in.</string>
+    <string name="xerr_not_available">Xbox Live is not available in your country</string>
+    <string name="microsoft_login_retry_later">Too many requests, please try again later.</string>
+</resources>
