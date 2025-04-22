@@ -18,6 +18,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
+            //noinspection ChromeOsAbiSupport
             abiFilters += listOf("arm64-v8a")
         }
     }
@@ -49,8 +50,14 @@ android {
     ndkVersion = "27.2.12479018"
 }
 
+tasks.named("preBuild") {
+    doFirst {
+        exec {
+            commandLine("cmd", "/k", "cd", "../", "&", "build_launcher")
+        }
+    }
+}
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -67,4 +74,6 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.androidx.ui.text.google.fonts)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.datastore.preferences)
 }

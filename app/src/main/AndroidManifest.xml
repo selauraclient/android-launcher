@@ -60,7 +60,7 @@
             tools:ignore="DiscouragedApi">
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="mc" />
+                android:value="selaura" />
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

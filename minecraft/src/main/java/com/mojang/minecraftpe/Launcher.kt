@@ -14,14 +14,8 @@ class Launcher : MainActivity() {
         } catch (e: Exception) {
             throw RuntimeException(e)
         }
-
     }
     init {
-        System.loadLibrary("mc")
+        System.loadLibrary("selaura")
     }
-    override fun hasWriteExternalStoragePermission(): Boolean {
-        return true
-    }
-
-    override fun requestStoragePermission(permissionReason: Int) {}
 }
