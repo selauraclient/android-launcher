@@ -11,6 +11,9 @@ Selaura Android Launcher
 
 This repository contains the full source code for the Android Selaura Launcher. This launcher helps run [Selaura Client](https://selauraclient.com/), which is the best modification for Minecraft: Bedrock Edition.
 
+> [!WARNING]  
+> You are accountable for your use of the Selaura Launcher. Spamming downloads, or doing something to cause a ratelimit to the API can warrant Google to blacklist your personal account. We are not responsible for the actions you take with your account, use common sense!
+
 ## 🖥️ Compatibility
 Selaura Launcher (Android) currently supports:
 - Android Pie (9.0)+ 
