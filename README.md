@@ -23,5 +23,9 @@ For Desktop support use the [Selaura Desktop Launcher](https://github.com/selaur
 ## 📈 Star History
 [![Star History Chart](https://api.star-history.com/svg?repos=selauraclient/android-launcher&type=Date)](https://www.star-history.com/#selauraclient/android-launcher&Date)
 
+## 🔒 Privacy Policy Notice
+- This app uses Google Sign-In to authenticate users. We do not collect, store, or share any personal information. All account data is managed securely by Google, and no account details are transmitted to our servers.
+- The app uses your Google account only to access version files you have purchased via Google Play. No other data is accessed or stored.
+
 ## 📄 License
 Selaura Launcher currently falls under the [GPL-3.0 License](LICENSE). Feel free to use this code as a fork in your own project. Thank you!
