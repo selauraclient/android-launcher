@@ -11,6 +11,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+@Suppress("UnstableApiUsage")
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -21,4 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Selaura Launcher"
 include(":app")
-include(":minecraft")
+include(":launcher")
+include(":stubs")

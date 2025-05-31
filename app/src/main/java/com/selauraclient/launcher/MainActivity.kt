@@ -1,156 +1,218 @@
 package com.selauraclient.launcher
 
-import Logo
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.Application
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.os.IBinder
+import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import androidx.core.view.drawToBitmap
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import com.selauraclient.launcher.global.Data
+import com.selauraclient.launcher.global.Data.authData
+import com.selauraclient.launcher.global.Data.downloadedVersions
+import com.selauraclient.launcher.global.Data.installedMC
+import com.selauraclient.launcher.global.Data.isNetworkConnected
+import com.selauraclient.launcher.global.Data.selectedVersionInfo
+import com.selauraclient.launcher.global.Data.showMessage
+import com.selauraclient.launcher.global.Data.updateAuthData
+import com.selauraclient.launcher.global.Data.updateInstalledMCInfo
+import com.selauraclient.launcher.global.Data.updateVersionsList
+import com.selauraclient.launcher.global.Data.versionsList
+import com.selauraclient.launcher.global.Downloader.bindToService
+import com.selauraclient.launcher.global.Downloader.connection
+import com.selauraclient.launcher.global.Downloader.downloadInfo
+import com.selauraclient.launcher.global.Downloader.downloadService
+import com.selauraclient.launcher.global.Downloader.isBound
+import com.selauraclient.launcher.global.Downloader.unbindFromService
+import com.selauraclient.launcher.ui.core.Dialog
+import com.selauraclient.launcher.ui.core.PermissionHandler
+import com.selauraclient.launcher.ui.screens.LauncherScreen
+import com.selauraclient.launcher.ui.screens.LoginScreen
+import com.selauraclient.launcher.ui.screens.MoreDialog
+import com.selauraclient.launcher.ui.theme.CircularRevealShape
 import com.selauraclient.launcher.ui.theme.SelauraLauncherTheme
-import com.selauraclient.launcher.ui.theme.SettingsManager
-import com.selauraclient.launcher.ui.theme.poppins
+import com.selauraclient.launcher.utils.DownloadsFolderWatcher
+import com.selauraclient.launcher.utils.NetworkHelper
+import com.selauraclient.launcher.utils.checkForUpdate
+import com.selauraclient.launcher.utils.getLauncher
+import com.selauraclient.launcher.utils.hideSystemBars
+import kotlinx.coroutines.launch
+import kotlin.math.hypot
+
+class Initializer(application: Application) : AndroidViewModel(application) {
+    init {
+        val context = application.applicationContext
+        updateVersionsList(context) {
+            updateInstalledMCInfo(context)
+            val selectedVer = installedMC.value
+            if (selectedVer != null) {
+                selectedVersionInfo.value = selectedVer to "Installed"
+            } else if (downloadedVersions.isNotEmpty()) {
+                val version = downloadedVersions.first()
+                selectedVersionInfo.value = versionsList.values.first{ it.versionCode == version } to "Downloaded"
+            }
+            if (selectedVersionInfo.value != null) {
+                context.getLauncher(selectedVersionInfo.value!!.first, selectedVersionInfo.value!!.second)
+            }
+        }
+        checkForUpdate(context)
+    }
+}
+
+
 
 class MainActivity : ComponentActivity() {
+    private val networkHelper by lazy { NetworkHelper(this) }
+    private lateinit var watcher: DownloadsFolderWatcher
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+        watcher = DownloadsFolderWatcher(this)
+        ViewModelProvider(this)[Initializer::class.java]
+        connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                val downloadBinder = binder as? DownloadService.DownloadBinder
+                downloadService = downloadBinder?.getService()
+                isBound = true
+
+                lifecycleScope.launch {
+                    downloadService?.overallDownloadInfo?.collect {
+                        downloadInfo.value = it
+                    }
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                downloadService = null
+                isBound = false
+            }
+        }
+        networkHelper.observe(this) { isConnected ->
+            isNetworkConnected.value = isConnected
+            if (isConnected) {
+                if (authData.value == null) updateAuthData(this)
+            } else {
+                showMessage("No internet connection")
+            }
+        }
         enableEdgeToEdge()
         setContent {
             SelauraLauncherTheme {
                 LauncherScreen()
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LauncherScreen() {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val logs = remember { mutableStateOf("") }
-    val settingsManager = SettingsManager(context, scope)
-    val theme by settingsManager.getStringAsFlow("theme").collectAsState(initial = "system")
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(header(), actions = {
-                ThemeSwitch(settingsManager, theme)
-            })
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { innerPadding ->
-        Surface(Modifier.padding(innerPadding).fillMaxSize()) {
-            Box {
-                Column(Modifier.align(Alignment.BottomCenter)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        HorizontalDivider()
-                        AnimatedButton ({ context.startLauncher(snackbarHostState, scope, logs) }, Modifier.width(150.dp), shape = MaterialTheme.shapes.small) {
-                            Text("Launch")
-                        }
-                    }
-                    LogsDisplay(logs)
+                StoragePermissionHandler()
+                MoreDialog()
+                LoginScreen()
+                Dialog(Data.dialogState.value)
+                LaunchTransition(this) {
+                    startActivity(Data.launcher.value!!.getIntent())
+                    finish()
                 }
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        bindToService()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unbindFromService()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        watcher.stopWatching()
+        println("onDestory")
+    }
 }
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-private fun LogsDisplay(logs: MutableState<String>) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .height(250.dp)
-            .padding(20.dp)
-            .background(Color(0f, 0f, 0f, .2f), MaterialTheme.shapes.medium)
-            .padding(12.dp)
-    ) {
-        Text("Logs:", fontSize = 15.sp, color = Color.Gray)
-        LazyColumn {
-            item {
-                Text(logs.value, fontSize = 10.sp)
+fun LaunchTransition(activity: Activity, onFinish: () -> Unit) {
+    if (Data.startLaunch.value) {
+        val view = LocalView.current
+        var screen by remember { mutableStateOf<Brush?>(null) }
+        val radius = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            activity.hideSystemBars()
+            screen = ShaderBrush(ImageShader(view.drawToBitmap().asImageBitmap()))
+            val screenWidthPx = activity.resources.displayMetrics.widthPixels.toFloat()
+            val screenHeightPx = activity.resources.displayMetrics.heightPixels.toFloat()
+            radius.animateTo(hypot(screenWidthPx, screenHeightPx), animationSpec = tween(600))
+            onFinish()
+        }
+        if (screen != null) {
+            Scaffold {
+                Box(Modifier
+                    .fillMaxSize()
+                    .background(screen!!)
+                    .clip(CircularRevealShape(radius.value, true))
+                    .background(Color.Black))
             }
         }
     }
 }
 
 @Composable
-private fun ThemeSwitch(settingsManager: SettingsManager, theme: String) {
-    val nextTheme = when (theme) {
-        "dark" -> "light"
-        else -> "dark"
-    }
+fun StoragePermissionHandler() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val context = LocalContext.current
 
-    val icon = when (theme) {
-        "dark" -> Icons.Default.DarkMode
-        "light" -> Icons.Default.LightMode
-        else -> Icons.Default.AutoMode
-    }
-
-    IconButton(
-        { settingsManager.setString("theme", nextTheme) },
-        { settingsManager.setString("theme", "system") },
-        Modifier.onGloballyPositioned { coordinates ->
-            val position = coordinates.localToWindow(Offset.Zero)
-            val size = coordinates.size
-            Globals.themeSwitchOffset.value = position + Offset(size.width / 2f, size.height / 2f)
+    PermissionHandler(
+        checkPermission = { Environment.isExternalStorageManager() },
+        requestPermission = {
+            it.launch(Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                "package:${context.packageName}".toUri()
+            ))
+        },
+        dialogContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Storage Permission Required", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text("Please grant storage access for full functionality.")
+            }
         }
-    ) {
-        Icon(icon, contentDescription = "Toggle theme")
-    }
-}
-
-private fun header() = @Composable {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Image(
-            Logo,
-            "Logo",
-            Modifier.padding(5.dp).size(32.dp),
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-        )
-        Text("selaura", fontSize = 25.sp, fontWeight = FontWeight.Thin, fontFamily = poppins)
-    }
+    )
 }

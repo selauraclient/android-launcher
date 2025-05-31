@@ -1,7 +1,10 @@
+import org.gradle.kotlin.dsl.support.serviceOf
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id ("kotlin-parcelize")
 }
 
 android {
@@ -25,11 +28,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -40,23 +44,52 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
-    }
-    externalNativeBuild {
-        cmake {
-            path("src/main/cpp/CMakeLists.txt")
-        }
     }
     ndkVersion = "27.2.12479018"
 }
 
-tasks.named("preBuild") {
+val prepareLauncherDex by tasks.registering {
+    group = "build"
+    description = "build launcher jar, dex it, rename & copy into assets, then update client"
+    dependsOn(":launcher:createFullJarRelease")
+    val launcherJar = project(":launcher").layout.buildDirectory.file(
+        "intermediates/full_jar/release/createFullJarRelease/full.jar"
+    )
+    val assetsDir = layout.projectDirectory.dir("src/main/assets")
+    inputs.file(launcherJar)
+    outputs.file(assetsDir.file("launcher.dex"))
+
     doFirst {
-        exec {
-            commandLine("cmd", "/k", "cd", "../", "&", "build_launcher")
+        val jarFile = launcherJar.get().asFile
+        val outDir = assetsDir.asFile
+        val sdkDir = android.sdkDirectory.absolutePath
+        val btVersion = android.buildToolsVersion
+        val isWindows = System.getProperty("os.name").startsWith("Windows")
+        val d8Path = "$sdkDir${File.separator}build-tools${File.separator}$btVersion${File.separator}d8${if (isWindows) ".bat" else ""}"
+        val execOperations = project.serviceOf<ExecOperations>()
+
+        execOperations.exec {
+            commandLine(d8Path, jarFile.absolutePath, "--output", outDir.absolutePath)
+        }
+
+        val classesDex = outDir.resolve("classes.dex")
+        val launcherDex = outDir.resolve("launcher.dex")
+        if (launcherDex.exists()) launcherDex.delete()
+        classesDex.renameTo(launcherDex)
+
+        execOperations.exec {
+            workingDir = rootDir
+            commandLine("git", "submodule",  "update", "--remote")
         }
     }
 }
+
+tasks.named("preBuild") {
+    dependsOn(prepareLauncherDex)
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -66,6 +99,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.browser)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -76,4 +110,15 @@ dependencies {
     implementation(libs.androidx.ui.text.google.fonts)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.okhttp)
+    implementation(libs.gson)
+    implementation(libs.ackpine.core)
+    implementation(libs.ackpine.ktx)
+    implementation(libs.ackpine.splits)
+    implementation(libs.ackpine.splits.ktx)
+    implementation(libs.gplayapi)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.documentfile)
 }

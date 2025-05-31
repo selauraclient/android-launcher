@@ -1,12 +1,10 @@
 package com.selauraclient.launcher.ui.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.unit.sp
 import com.selauraclient.launcher.R
 
 val provider = GoogleFont.Provider(
@@ -15,19 +13,25 @@ val provider = GoogleFont.Provider(
     certificates = R.array.com_google_android_gms_fonts_certs
 )
 val poppins = FontFamily(Font(googleFont = GoogleFont("Poppins"), fontProvider = provider))
-val Typography = Typography(
-    bodyLarge = TextStyle(
-        fontFamily =  FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 18.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
-    )
-)
+@Composable
+fun typography(): Typography {
+    return Typography().run {
+        copy(
+            displayLarge = displayLarge.copy(fontFamily = poppins),
+            displayMedium = displayMedium.copy(fontFamily = poppins),
+            displaySmall = displaySmall.copy(fontFamily = poppins),
+            headlineLarge = headlineLarge.copy(fontFamily = poppins),
+            headlineMedium = headlineMedium.copy(fontFamily = poppins),
+            headlineSmall = headlineSmall.copy(fontFamily = poppins),
+            titleLarge = titleLarge.copy(fontFamily = poppins),
+            titleMedium = titleMedium.copy(fontFamily = poppins),
+            titleSmall = titleSmall.copy(fontFamily = poppins),
+            bodyLarge = bodyLarge.copy(fontFamily = poppins),
+            bodyMedium = bodyMedium.copy(fontFamily = poppins),
+            bodySmall = bodySmall.copy(fontFamily = poppins),
+            labelLarge = labelLarge.copy(fontFamily = poppins),
+            labelMedium = labelMedium.copy(fontFamily = poppins),
+            labelSmall = labelSmall.copy(fontFamily = poppins)
+        )
+    }
+}

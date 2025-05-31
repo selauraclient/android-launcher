@@ -1,6 +1,6 @@
 package com.selauraclient.launcher.ui.theme
 
-import android.content.Context
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -37,18 +37,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.drawToBitmap
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import com.selauraclient.launcher.Globals
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
+import com.selauraclient.launcher.global.Data
+import com.selauraclient.launcher.utils.SettingsManager
 import kotlin.math.hypot
 
 private val LightColorScheme = lightColorScheme(
@@ -60,8 +52,9 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color(0xFFF2F1E3),
     secondary = Color(0x0D000000),
     tertiary = Color(0x1A000000),
-    outline = Color(0x4D000000)
-)
+    outline = Color(0XFFEAE9E2),
+    surfaceContainer = Color(0xFFF8F7EF)
+    )
 
 private val DarkColorScheme = darkColorScheme(
     background = Color(0xFF222222),
@@ -72,9 +65,9 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color(0xFF222222),
     secondary = Color(0x1AFFFFFF),
     tertiary = Color(0x1AFFFFFF),
-    outline = Color(0xFFF2F1E3)
+    outline = Color(0xFF444444),
+    surfaceContainer = Color(0xFF181818)
 )
-
 
 @Composable
 fun SelauraLauncherTheme(
@@ -82,23 +75,27 @@ fun SelauraLauncherTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val settingsManager = SettingsManager(context, rememberCoroutineScope())
-
-    val themePref = settingsManager.getStringAsFlow("theme").collectAsState("").value
-    val targetDarkTheme = when (themePref) {
+    val scope = rememberCoroutineScope()
+    val settingsManager = remember { SettingsManager(context, scope) }
+    val targetDarkTheme = when (settingsManager.getStringAsFlow("theme").collectAsState("").value) {
         "dark" -> true
         "light" -> false
         else -> darkTheme
+    }
+    val activity = LocalActivity.current
+    LaunchedEffect(targetDarkTheme) {
+        activity?.run {
+            WindowInsetsControllerCompat(window, window.decorView).run {
+                isAppearanceLightStatusBars = !targetDarkTheme
+                isAppearanceLightNavigationBars = !targetDarkTheme
+            }
+        }
     }
 
     val colorScheme = if (targetDarkTheme) DarkColorScheme else LightColorScheme
     val newColorScheme = remember { mutableStateOf<ColorScheme?>(null) }
     CircularRevealThemeContainer(colorScheme, newColorScheme) {
-        MaterialTheme(
-            colorScheme = newColorScheme.value ?: colorScheme,
-            typography = Typography,
-            content = content
-        )
+        MaterialTheme(newColorScheme.value ?: colorScheme, typography = typography()) { content() }
     }
 }
 
@@ -128,56 +125,19 @@ fun CircularRevealThemeContainer(
 
     Box(
         Modifier
-            .fillMaxSize().then(
-                if (previousScreen != null) Modifier.background(
-                    previousScreen!!
-                ) else Modifier.background(colorScheme.onBackground)
-            )
+            .fillMaxSize()
+            .then(previousScreen?.let { Modifier.background(it) } ?: Modifier.background(colorScheme.onBackground))
             .clip(CircularRevealShape(revealRadius.value, rippleFromCenter))
             .background(colorScheme.background)
-    ) {
-        content()
-    }
+    ) { content() }
 }
 
 class CircularRevealShape(private val radius: Float, private val fromCenter: Boolean = false) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        return Outline.Generic(
-            path = Path().apply {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val origin = if (fromCenter) center else Globals.themeSwitchOffset.value
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        return Outline.Generic(Path().apply {
+                val origin = if (fromCenter) Offset(size.width / 2f, size.height / 2f) else Data.themeSwitchOffset.value
                 addOval(Rect(origin - Offset(radius, radius), origin + Offset(radius, radius)))
             }
         )
-    }
-}
-
-
-private val Context.settings by preferencesDataStore(name = "settings")
-@Suppress("unused")
-class SettingsManager(private val context: Context, private val scope: CoroutineScope) {
-
-    fun getIntAsFlow(key: String): Flow<Int> = context.settings.data.map { it[intPreferencesKey(key)] ?: 0 }
-
-    fun setInt(key: String, value: Int) {
-        scope.launch { context.settings.edit { it[intPreferencesKey(key)] = value } }
-    }
-
-    fun getStringAsFlow(key: String): Flow<String> = context.settings.data.map { it[stringPreferencesKey(key)] ?: "" }
-
-    suspend fun getString(key: String): String = getStringAsFlow(key).first()
-
-    fun setString(key: String, value: String) {
-        scope.launch { context.settings.edit { it[stringPreferencesKey(key)] = value } }
-    }
-
-    fun getBooleanAsFlow(key: String): Flow<Boolean> = context.settings.data.map { it[booleanPreferencesKey(key)] ?: false }
-
-    fun setBoolean(key: String, value: Boolean) {
-        scope.launch { context.settings.edit { it[booleanPreferencesKey(key)] = value } }
     }
 }
