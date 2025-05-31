@@ -108,7 +108,6 @@ import com.selauraclient.launcher.utils.popyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import ru.solrudev.ackpine.splits.Apk
 import ru.solrudev.ackpine.splits.SplitPackage.Companion.toSplitPackage
 import ru.solrudev.ackpine.splits.ZippedApkSplits
@@ -410,7 +409,9 @@ private fun FilterOption(option: String, filters: MutableList<String>) {
     }
 }
 
-fun getInfoFromBundle(context: Context, bundleUri: Uri): Pair<String, Long> = runBlocking {
+suspend fun getInfoFromBundle(context: Context, bundleUri: Uri): Pair<String, Long> {
     val splitsSequence = ZippedApkSplits.getApksForUri(bundleUri, context).toSplitPackage()
-    splitsSequence.get().base.first().apk.run { packageName to versionCode }
+    return splitsSequence.get().base.first().apk.run {
+        packageName to versionCode
+    }
 }

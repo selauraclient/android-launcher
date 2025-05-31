@@ -8,6 +8,14 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("launcher") {
+            storeFile = file("C:\\Users\\Zeyro\\OneDrive\\Desktop\\keys\\selaura.jks")
+            storePassword = "391720pass"
+            keyPassword = "391720pass"
+            keyAlias = "launcher"
+        }
+    }
     namespace = "com.selauraclient.launcher"
     compileSdk = 35
 
@@ -17,11 +25,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        ndk {
-            //noinspection ChromeOsAbiSupport
+        ndk {//noinspection ChromeOsAbiSupport
             abiFilters += listOf("arm64-v8a")
         }
     }
@@ -29,11 +35,12 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("launcher")
         }
     }
     compileOptions {
@@ -47,7 +54,6 @@ android {
         buildConfig = true
         compose = true
     }
-    ndkVersion = "27.2.12479018"
 }
 
 val prepareLauncherDex by tasks.registering {
@@ -78,11 +84,6 @@ val prepareLauncherDex by tasks.registering {
         val launcherDex = outDir.resolve("launcher.dex")
         if (launcherDex.exists()) launcherDex.delete()
         classesDex.renameTo(launcherDex)
-
-        execOperations.exec {
-            workingDir = rootDir
-            commandLine("git", "submodule",  "update", "--remote")
-        }
     }
 }
 
