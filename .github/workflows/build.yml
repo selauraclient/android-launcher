@@ -1,0 +1,51 @@
+name: Build & Push Selaura Launcher
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  CDN_REPO: https://x-access-token:${{ secrets.CDN_TOKEN }}@github.com/selauraclient/cdn.git
+  COMMIT_EMAIL: "github-actions@users.noreply.github.com"
+  COMMIT_NAME: "GitHub Actions"
+
+jobs:
+  build-launcher:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Launcher Repo
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant Execute Permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build APK
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK to CDN Repo
+        run: |
+          git config --global user.email "$COMMIT_EMAIL"
+          git config --global user.name "$COMMIT_NAME"
+          git clone $CDN_REPO cdn
+          mkdir -p cdn/launcher
+          
+          APK_PATH=$(find . -type f -name "*release*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ No APK found!" && exit 1
+          fi
+
+          cp "$APK_PATH" cdn/launcher/
+          cd cdn
+          git add .
+          git commit -m "Upload Launcher APK from ${{ github.sha }}" || echo "No changes to commit"
+          git push
